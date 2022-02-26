@@ -1,0 +1,14 @@
+---
+labels: ['react', 'streamline icons', '[PARENT]']
+---
+
+import { ThemeProvider } from 'styled-components'
+import theme, { GlobalStyle } from '@berlitz/micro-harmony.theme.portal'
+import Gallery from '@berlitz/streamlineicons.ui.gallery'
+[IMPORTS]
+
+<Gallery
+  icons={{
+[ICONS]
+  }}
+/>
