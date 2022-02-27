@@ -48,19 +48,21 @@ export {
 ${files.map((file) => `\t${file.replace('.js', '')},`).join('\n')}
 }`
 
-const getDirectories = async (source = '') => {
+const rebuild = async (source = '') => {
   const dirs = (await readdir(source, { withFileTypes: true }))
     .filter((dirent) => dirent.isDirectory())
     .map((dirent) => dirent.name)
 
   await dirs.map(async (dir) => {
     const fullDir = `${source}/${dir}`
-    const files = await readdir(fullDir)
-    const filteredFiles = files.filter(
-      (file) =>
-        file !== 'index.ts' && file !== 'Icon.js' && file !== 'index.compositions.tsx' && file !== 'index.docs.mdx'
-    )
-    await filteredFiles.map(async (file) => {
+    const rawFiles = await readdir(fullDir)
+    const files = rawFiles
+      .filter(
+        (file) =>
+          file !== 'index.ts' && file !== 'Icon.js' && file !== 'index.compositions.tsx' && file !== 'index.docs.mdx'
+      )
+      .sort()
+    await files.map(async (file) => {
       const newFile = (await readFile(`${fullDir}/${file}`, 'utf8')).replace('../../../Icon', './Icon')
       return await writeFile(`${fullDir}/${file}`, newFile)
     })
@@ -70,27 +72,32 @@ const getDirectories = async (source = '') => {
       `${fullDir}/index.compositions.tsx`,
       (await readFile('./index.compositions.txt', 'utf8'))
         .split('[IMPORTS]')
-        .join(getComps(filteredFiles))
+        .join(getComps(files))
         .split('[EXPORTS]')
-        .join(getCompsIcons(filteredFiles, '\t\t\t'))
+        .join(getCompsIcons(files, '\t\t\t'))
     )
     await writeFile(
       `${fullDir}/index.docs.mdx`,
-      (await readFile('./index.docs.txt', 'utf8'))
+      (
+        await readFile('./index.docs.txt', 'utf8')
+      )
         .split('[IMPORTS]')
-        .join(getComps(filteredFiles))
+        .join(getComps(files))
         .split('[ICONS]')
-        .join(getDocsIcons(filteredFiles, '\t\t'))
+        .join(getDocsIcons(files, '\t\t'))
         .split('[PARENT]')
         .join(`${source.split('/').pop()}`.split('-').join(' '))
     )
-    await writeFile(`${fullDir}/index.ts`, getIndex(filteredFiles))
-    console.log(
-      `bbit add ${fullDir.replace('./', 'components/')} -i ${fullDir
-        .replace('./', '')
-        .toLowerCase()}`
-    )
+    await writeFile(`${fullDir}/index.ts`, getIndex(files))
+    console.log(`bbit add ${fullDir.replace('./', 'components/')} -i ${fullDir.replace('./', '').toLowerCase()}`)
   })
 }
 
-getDirectories('./bold/01-Interface-Essential')
+const getCommands = async (source) =>
+  (await readdir(source, { withFileTypes: true }))
+    .filter((dirent) => dirent.isDirectory())
+    .map((dirent) => dirent.name)
+    .sort()
+    .forEach((dir) => rebuild(`${source}/${dir}`))
+
+getCommands('./bold')
