@@ -2,20 +2,22 @@ const {
   promises: { readdir },
   readFile: fsReadFile,
   writeFile: fsWriteFile,
+  appendFile: fsAppendFile,
 } = require('fs')
 const util = require('util')
 const readFile = util.promisify(fsReadFile)
 const writeFile = util.promisify(fsWriteFile)
+const appendFile = util.promisify(fsAppendFile)
 
 const getComps = (files = []) =>
   `${files
     .map((file) => {
       const name = file.split('.js').join('')
-      return `import ${name}Icon from './${name}'`
+      return `import ${name}Icon from './${name}'`.split('import 3D').join('import ThreeD')
     })
     .join('\n')}`
 
-const getCompsIcons = (files = [], tabs = '') =>
+const getCompsIcons = (files = []) =>
   `${files
     .map((file) => {
       const name = file.split('.js').join('')
@@ -26,6 +28,14 @@ const getCompsIcons = (files = [], tabs = '') =>
     }}
   />
 )`
+        .split('const 3D')
+        .join('const ThreeD')
+        .split(`
+      3D`)
+        .join(`
+      ThreeD`)
+        .split(': 3D')
+        .join(': ThreeD')
     })
     .join('\n')}`
 
@@ -34,21 +44,24 @@ const getDocsIcons = (files = [], tabs = '') =>
     .map((file) => {
       const name = file.split('.js').join('')
       return `${tabs}${name}: ${name}Icon,`
+        .split(`${tabs}3D`).join(`${tabs}ThreeD`)
+        .split(`: 3D`).join(`: ThreeD`)
     })
     .join('\n')}`
 
 const getIndex = (files = []) => `${files
   .map((file) => {
     const name = file.split('.js').join('')
-    return `import ${name} from './${name}'`
+    return `import ${name} from './${name}'`.split('import 3D').join('import ThreeD')
   })
   .join('\n')}
 
 export {
-${files.map((file) => `\t${file.replace('.js', '')},`).join('\n')}
+${files.map((file) => `\t${file.replace('.js', '')},`).join('\n').split('\t3D').join('\tThreeD')}
 }`
 
-const rebuild = async (source = '') => {
+const rebuild = async (src, dir) => {
+  const source = `./${src}/${dir}`
   const dirs = (await readdir(source, { withFileTypes: true }))
     .filter((dirent) => dirent.isDirectory())
     .map((dirent) => dirent.name)
@@ -74,7 +87,7 @@ const rebuild = async (source = '') => {
         .split('[IMPORTS]')
         .join(getComps(files))
         .split('[EXPORTS]')
-        .join(getCompsIcons(files, '\t\t\t'))
+        .join(getCompsIcons(files))
     )
     await writeFile(
       `${fullDir}/index.docs.mdx`,
@@ -85,19 +98,73 @@ const rebuild = async (source = '') => {
         .join(getComps(files))
         .split('[ICONS]')
         .join(getDocsIcons(files, '\t\t'))
+        .split('[TYPE]')
+        .join(src)
         .split('[PARENT]')
         .join(`${source.split('/').pop()}`.split('-').join(' '))
+        .split('[CAT]')
+        .join(`${dir.split('-').join(' ')}`)
+        .split('[ICON_NAMES]')
+        .join(
+          `${files.map((file) =>
+            `'${file
+              .split('.js')
+              .join('')
+              .replace(/([a-z])([A-Z])/g, '$1 $2')
+              .replace('3D', '3D ')
+              // .split('3D')
+              // .join('3D ')
+            }'`
+          ).join(', ')}`
+        )
     )
-    await writeFile(`${fullDir}/index.ts`, getIndex(files))
-    console.log(`bbit add ${fullDir.replace('./', 'components/')} -i ${fullDir.replace('./', '').toLowerCase()}`)
+    return await writeFile(`${fullDir}/index.ts`, getIndex(files))
+    // console.log(`bbit add ${fullDir.replace('./', 'components/')} -i ${fullDir.replace('./', '').toLowerCase()}`)
   })
 }
 
-const getCommands = async (source) =>
-  (await readdir(source, { withFileTypes: true }))
+const harmonyfy = async (source) =>
+  (await readdir(`./${source}`, { withFileTypes: true }))
     .filter((dirent) => dirent.isDirectory())
     .map((dirent) => dirent.name)
     .sort()
-    .forEach((dir) => rebuild(`${source}/${dir}`))
+    .forEach((dir) => rebuild(source, dir))
 
-getCommands('./bold')
+const getMissingCmds = async (source = '') => {
+  const add = (await readdir(source, { withFileTypes: true }))
+    .filter((dirent) => dirent.isDirectory())
+    .map((dirent) => {
+      const fullDir = `${source}/${dirent.name}`
+      return `bbit add ${fullDir.replace('./', 'components/')} -i ${fullDir.replace('./', '').toLowerCase()}`
+    })
+    .sort()
+    .join(' && ')
+
+  const compile = (await readdir(source, { withFileTypes: true }))
+    .filter((dirent) => dirent.isDirectory())
+    .map((dirent) => `${source}/${dirent.name}`.replace('./', '').toLowerCase())
+    .sort()
+    .join(' ')
+
+  return await appendFile(`./commands.txt`, `${add} && bbit compile ${compile} && bbit tag ${compile} && `)
+}
+
+const saveCommands = async (source, cat) => {
+  (await readdir(source, { withFileTypes: true }))
+    .filter((dirent) => dirent.isDirectory())
+    .map((dirent) => dirent.name)
+    .filter((n) => n === cat)
+    .sort()
+    .forEach((dir) => getMissingCmds(`${source}/${dir}`))
+}
+
+const getCommands = async (source) => {
+  const dirs = (await readdir(source, { withFileTypes: true }))
+    .filter((dirent) => dirent.isDirectory())
+    .map((dirent) => dirent.name)
+    .sort()
+    .forEach((cat) => saveCommands(source, cat))
+}
+
+// harmonyfy('regular')
+getCommands('./regular')

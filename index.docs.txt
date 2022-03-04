@@ -1,5 +1,5 @@
 ---
-labels: ['react', 'streamline icons', '[PARENT]']
+labels: ['react', 'streamline icons', '[TYPE]', '[PARENT]', '[CAT]', [ICON_NAMES]]
 ---
 
 import { ThemeProvider } from 'styled-components'
